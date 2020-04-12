@@ -4,8 +4,12 @@ import datetime
 import os.path
 import sys
 import backtrader as bt
+import backtrader.analyzers as btanalyzers
+import backtrader.feeds as btfeeds
+import backtrader.strategies as btstrats
+import pyfolio as pf
 
-class CrossoverStrategy(bt.Strategy):
+class Crossover9_21WithSwing(bt.Strategy):
     params = (
         ('printlog', False),
     )
@@ -55,6 +59,7 @@ class CrossoverStrategy(bt.Strategy):
 
     def next(self):
         self.log('Close, %.2f' % self.dataclose[0])
+        swing_high = max([self.datas[0].close[i] for i in range(-20,0)])
         if self.order_pending:
             return
         if not self.position:
@@ -71,21 +76,3 @@ class CrossoverStrategy(bt.Strategy):
                  (self.broker.getvalue()), doprint=True)
 
 
-if __name__ == '__main__':
-    cerebro = bt.Cerebro()
-
-    cerebro.addstrategy(CrossoverStrategy, printlog=True)
-
-    datapath = './test_data.txt'
-    data = bt.feeds.YahooFinanceCSVData(
-        dataname=datapath,
-        fromdate=datetime.datetime(2000, 1, 1),
-        todate=datetime.datetime(2010, 12, 31),
-        reverse=False)
-
-    cerebro.adddata(data)
-    cerebro.broker.setcash(1000.0)
-    cerebro.addsizer(bt.sizers.FixedSize, stake=10)
-    cerebro.broker.setcommission(commission=0.0)
-    cerebro.run()
-    cerebro.plot()
