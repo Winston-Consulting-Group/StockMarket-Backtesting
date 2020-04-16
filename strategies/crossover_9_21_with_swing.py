@@ -65,11 +65,11 @@ class Crossover9_21WithSwing(bt.Strategy):
         if not self.position:
             if self.simple_moving_avg_indicator_9[0] > self.simple_moving_avg_indicator_21[0]:
                 self.log('BUY CREATE, %.2f' % self.dataclose[0])
-                self.order_pending = self.buy()
+                self.order_pending = self.buy(data=self.dnames["call_290.0_11/02/2018"])
         else:
             if self.simple_moving_avg_indicator_21[0] > self.simple_moving_avg_indicator_9[0]:
                 self.log('SELL CREATE, %.2f' % self.dataclose[0])
-                self.order_pending = self.sell()
+                self.order_pending = self.sell(data=self.dnames["call_290.0_11/02/2018"])
 
     def stop(self):
         self.log('(MA Period ?) Ending Value %.2f' %

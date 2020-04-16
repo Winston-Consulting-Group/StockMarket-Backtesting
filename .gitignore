@@ -1,3 +1,6 @@
 backtest_env/
 data/nq-1m.csv
+data/options_data/*
 .ipynb_checkpoints/
+*.pyc
+*.DS_STORE
