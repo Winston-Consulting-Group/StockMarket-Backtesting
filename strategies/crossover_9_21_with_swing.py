@@ -20,6 +20,7 @@ class Crossover9_21WithSwing(bt.Strategy):
             print('%s, %s' % (dt.isoformat(), txt))
 
     def __init__(self):
+        self.count = 0
         self.dataclose = self.datas[0].close
         self.order_pending = None
         self.buy_price = None
@@ -57,19 +58,34 @@ class Crossover9_21WithSwing(bt.Strategy):
         self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
                  (trade.pnl, trade.pnlcomm))
 
+    def prenext(self):
+        self.log('Close, %.2f' % self.dataclose[0])
+        swing_high = max([self.datas[0].close[i] for i in range(-20,0)])
+        if self.order_pending:
+            return
+        if not self.getposition(data=self.dnames["call_260.0_06/19/2020"]):
+            if self.simple_moving_avg_indicator_9[0] > self.simple_moving_avg_indicator_21[0]:
+                self.log('BUY CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
+                self.order_pending = self.buy(data=self.dnames["call_260.0_06/19/2020"])
+        else:
+            if self.simple_moving_avg_indicator_9[0] < self.simple_moving_avg_indicator_21[0]:
+                self.log('SELL CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
+                self.order_pending = self.sell(data=self.dnames["call_260.0_06/19/2020"])
+
+
     def next(self):
         self.log('Close, %.2f' % self.dataclose[0])
         swing_high = max([self.datas[0].close[i] for i in range(-20,0)])
         if self.order_pending:
             return
-        if not self.position:
+        if not self.getposition(data=self.dnames["call_260.0_06/19/2020"]):
             if self.simple_moving_avg_indicator_9[0] > self.simple_moving_avg_indicator_21[0]:
-                self.log('BUY CREATE, %.2f' % self.dataclose[0])
-                self.order_pending = self.buy(data=self.dnames["call_290.0_11/02/2018"])
+                self.log('BUY CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
+                self.order_pending = self.buy(data=self.dnames["call_260.0_06/19/2020"])
         else:
-            if self.simple_moving_avg_indicator_21[0] > self.simple_moving_avg_indicator_9[0]:
-                self.log('SELL CREATE, %.2f' % self.dataclose[0])
-                self.order_pending = self.sell(data=self.dnames["call_290.0_11/02/2018"])
+            if self.simple_moving_avg_indicator_9[0] < self.simple_moving_avg_indicator_21[0]:
+                self.log('SELL CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
+                self.order_pending = self.sell(data=self.dnames["call_260.0_06/19/2020"])
 
     def stop(self):
         self.log('(MA Period ?) Ending Value %.2f' %
