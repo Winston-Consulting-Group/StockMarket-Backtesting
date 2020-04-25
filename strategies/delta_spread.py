@@ -8,8 +8,9 @@ import backtrader.analyzers as btanalyzers
 import backtrader.feeds as btfeeds
 import backtrader.strategies as btstrats
 import pyfolio as pf
+from .option_helpers import OptionHelpers
 
-class Crossover9_21WithSwing(bt.Strategy):
+class DeltaSpread(bt.Strategy):
     params = (
         ('printlog', False),
     )
@@ -25,6 +26,10 @@ class Crossover9_21WithSwing(bt.Strategy):
         self.order_pending = None
         self.buy_price = None
         self.buy_commission = None
+        self.current_position = False
+        self.option_helpers = OptionHelpers(self.dnames)
+        self.option_chain = None
+        self.option_chain_key = None
         self.simple_moving_avg_indicator_9 = bt.indicators.SimpleMovingAverage(
             self.datas[0], period=9)
         self.simple_moving_avg_indicator_21 = bt.indicators.SimpleMovingAverage(
@@ -48,8 +53,12 @@ class Crossover9_21WithSwing(bt.Strategy):
                           order.executed.value,
                           order.executed.comm))
             self.bar_executed = len(self)
-        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log('Order Canceled/Margin/Rejected')
+        elif order.status in [order.Canceled]:
+            self.log('Order Canceled')
+        elif order.status in [order.Margin]:
+            self.log('Order Margin problem')
+        elif order.status in [order.Rejected]:
+            self.log('Order Rejected')
         self.order_pending = None
 
     def notify_trade(self, trade):
@@ -58,34 +67,37 @@ class Crossover9_21WithSwing(bt.Strategy):
         self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
                  (trade.pnl, trade.pnlcomm))
 
-    def prenext(self):
+    def default_next(self):
         self.log('Close, %.2f' % self.dataclose[0])
-        swing_high = max([self.datas[0].close[i] for i in range(-20,0)])
+        self.option_helpers.update_data(self.dnames)
+        if not self.current_position:
+            chain_date = self.option_helpers.get_closest_expiration(60, self.datas[0].datetime.date(0))
+            self.option_chain_key = self.option_helpers.get_series_by_delta(0.2, chain_date, "call")
+            self.option_chain = self.option_helpers.get_chain_by_name(self.option_chain_key)
+        (cur_type, cur_strike, cur_expiration) = self.option_chain_key.split('_')
+
+
         if self.order_pending:
             return
-        if not self.getposition(data=self.dnames["call_260.0_06/19/2020"]):
-            if self.simple_moving_avg_indicator_9[0] > self.simple_moving_avg_indicator_21[0]:
-                self.log('BUY CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
-                self.order_pending = self.buy(data=self.dnames["call_260.0_06/19/2020"])
-        else:
+        if not self.current_position:
             if self.simple_moving_avg_indicator_9[0] < self.simple_moving_avg_indicator_21[0]:
-                self.log('SELL CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
-                self.order_pending = self.sell(data=self.dnames["call_260.0_06/19/2020"])
+                self.count = 0
+                self.current_position = True
+                self.log('SELL CREATE, %.2f' % self.option_chain.close[0])
+                self.order_pending = self.sell(data=self.option_chain)
+        else:
+            cur_expiration_dt = datetime.datetime.strptime(cur_expiration, '%m/%d/%Y')
+            time_to_expiry = cur_expiration_dt.date() - self.datas[0].datetime.date(0)
+            if time_to_expiry.days < 5 or self.dataclose[0] >= float(cur_strike):
+                self.current_position = False
+                self.log('BUY CREATE, %.2f' % self.option_chain.close[0])
+                self.order_pending = self.buy(data=self.option_chain)
 
+    def prenext(self):
+        self.default_next()
 
     def next(self):
-        self.log('Close, %.2f' % self.dataclose[0])
-        swing_high = max([self.datas[0].close[i] for i in range(-20,0)])
-        if self.order_pending:
-            return
-        if not self.getposition(data=self.dnames["call_260.0_06/19/2020"]):
-            if self.simple_moving_avg_indicator_9[0] > self.simple_moving_avg_indicator_21[0]:
-                self.log('BUY CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
-                self.order_pending = self.buy(data=self.dnames["call_260.0_06/19/2020"])
-        else:
-            if self.simple_moving_avg_indicator_9[0] < self.simple_moving_avg_indicator_21[0]:
-                self.log('SELL CREATE, %.2f' % self.dnames["call_260.0_06/19/2020"].close[0])
-                self.order_pending = self.sell(data=self.dnames["call_260.0_06/19/2020"])
+        self.default_next()
 
     def stop(self):
         self.log('(MA Period ?) Ending Value %.2f' %
